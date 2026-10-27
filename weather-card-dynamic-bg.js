@@ -10,6 +10,7 @@ const DEFAULTS = {
   entity: '',
   weatherentity: '',
   sunentity: 'sun.sun',
+  air_quality_entity: 'sensor.airly_ogolny_indeks_jakosci_powietrza',
   name: '',
   show_forecast: true,
   forecast_type: 'hourly',
@@ -732,6 +733,16 @@ class ScopedSkyRenderer {
   }
 }
 
+function getCaqiColor(val) {
+  const n = parseFloat(val);
+  if (!Number.isFinite(n)) return '#ffffff';
+  if (n <= 25) return '#2ecc71';
+  if (n <= 50) return '#a3d900';
+  if (n <= 75) return '#f1c40f';
+  if (n <= 100) return '#e67e22';
+  return '#e74c3c';
+}
+
 class WeatherCardDynamicBg extends HTMLElement {
   constructor() {
     super();
@@ -748,10 +759,21 @@ class WeatherCardDynamicBg extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    if (this._forecastCard) this._forecastCard.hass = hass;
+    if (this._forecastCard) {
+      this._forecastCard.hass = hass;
+
+      const aqiState = hass.states['sensor.airly_ogolny_indeks_jakosci_powietrza'];
+      if (aqiState && aqiState.state !== undefined) {
+        const val = aqiState.state;
+        const valFormatted = String(aqiState.state).replace('.', ',');
+        const color = getCaqiColor(val);
+
+        this._forecastCard.style.setProperty('--airly-aqi-text', `"${valFormatted} CAQI"`);
+        this._forecastCard.style.setProperty('--airly-aqi-color', color);
+      }
+    }
     this._updateScene();
   }
-
   _updateClock() {
     const timeEl = this.shadowRoot.getElementById('clock-time');
     const dateEl = this.shadowRoot.getElementById('clock-date');
@@ -847,6 +869,25 @@ class WeatherCardDynamicBg extends HTMLElement {
             font-weight: 300;
             --primary-text-color: #ffffff !important;
             --secondary-text-color: rgba(255, 255, 255, 0.85) !important;
+          }
+          .temp-attribute .temp {
+            font-size: 2.6rem !important;
+            line-height: 1 !important;
+          }
+          .temp-attribute .temp span {
+            font-size: 1.6rem !important;
+          }
+
+          .temp-attribute .attribute {
+            font-size: 0 !important;
+          }
+          .temp-attribute .attribute::after {
+            content: var(--airly-aqi-text, '');
+            color: var(--airly-aqi-color, #ffffff) !important;
+            font-size: 1rem !important;
+            line-height: 1.4;
+            display: inline-block;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
           }
         `;
         el.shadowRoot.appendChild(s);
